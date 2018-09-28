@@ -25,17 +25,18 @@ class MonitorServerLogger(ServerLogger):
 
         self.proto_arena = ManagerLog()
 
-    def log_string(self, s, **kwargs):
-        self.proto_arena.clear()
+    def send(self):
         self.proto_arena.manager_id = self.server_id
-        self.proto_arena.string_log = s
         self.sock.send(self.proto_arena.SerializeToString())
+        self.proto_arena.clear()
+
+    def log_string(self, s, **kwargs):
+        self.proto_arena.string_log = s
+        self.send()
 
     def log_error(self, s, **kwargs):
-        self.proto_arena.clear()
-        self.proto_arena.manager_id = self.server_id
         self.proto_arena.string_error = s
-        self.sock.send(self.proto_arena.SerializeToString())
+        self.send()
 
     def starting_server(self):
         self.log_string("Starting server")
@@ -56,10 +57,12 @@ class MonitorServerLogger(ServerLogger):
         self.log_string("Waiting for setup.")
 
     def making_state(self, handle: str):
-        self.log_string("Making state {}".format(handle))
+        self.proto_arena.set_job = handle
+        self.send()
 
     def closing_state(self, handle: str):
-        self.log_string("Closing client {}".format(handle))
+        self.proto_arena.clear_job = handle
+        self.send()
 
     def waiting_for_operation(self, handle: str):
         self.log_string("Waiting for operation for job {}".format(handle))
@@ -94,17 +97,18 @@ class MonitorWorkerLogger(WorkerLogger):
 
         self.proto_arena = ManagerLog()
 
-    def log_string(self, s, **kwargs):
-        self.proto_arena.clear()
+    def send(self):
         self.proto_arena.worker_id = self.worker_id
-        self.proto_arena.string_log = s
         self.sock.send(self.proto_arena.SerializeToString())
+        self.proto_arena.clear()
+
+    def log_string(self, s, **kwargs):
+        self.proto_arena.string_log = s
+        self.send()
 
     def log_error(self, s, **kwargs):
-        self.proto_arena.clear()
-        self.proto_arena.worker_id = self.worker_id
         self.proto_arena.string_error = s
-        self.sock.send(self.proto_arena.SerializeToString())
+        self.send()
 
     def starting_server(self):
         self.log_string("Starting server")
@@ -122,10 +126,12 @@ class MonitorWorkerLogger(WorkerLogger):
         self.log_string("Setup: {}".format(setup))
 
     def making_state(self, handle: str):
-        self.log_string("Making state {}".format(handle))
+        self.proto_arena.set_job = handle
+        self.send()
 
     def closing_state(self, handle: str):
-        self.log_string("Closing client {}".format(handle))
+        self.proto_arena.clear_job = handle
+        self.send()
 
     def waiting_for_operation(self, handle: str):
         self.log_string("Waiting for operation for job {}".format(handle))

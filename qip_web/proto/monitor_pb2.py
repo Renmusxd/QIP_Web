@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='monitor.proto',
   package='qip_web',
   syntax='proto2',
-  serialized_pb=_b('\n\rmonitor.proto\x12\x07qip_web\"!\n\x0bManagerInfo\x12\x12\n\nmanager_id\x18\x01 \x01(\t\"\x1f\n\nWorkerInfo\x12\x11\n\tworker_id\x18\x01 \x01(\t\"m\n\x0eLoggerHostInfo\x12\'\n\x07manager\x18\x01 \x01(\x0b\x32\x14.qip_web.ManagerInfoH\x00\x12%\n\x06worker\x18\x02 \x01(\x0b\x32\x13.qip_web.WorkerInfoH\x00\x42\x0b\n\thost_info\"-\n\nManagerLog\x12\x14\n\nstring_log\x18\x01 \x01(\tH\x00\x42\t\n\x07logtype\",\n\tWorkerLog\x12\x14\n\nstring_log\x18\x01 \x01(\tH\x00\x42\t\n\x07logtype')
+  serialized_pb=_b('\n\rmonitor.proto\x12\x07qip_web\"!\n\x0bManagerInfo\x12\x12\n\nmanager_id\x18\x01 \x01(\t\"\x1f\n\nWorkerInfo\x12\x11\n\tworker_id\x18\x01 \x01(\t\"m\n\x0eLoggerHostInfo\x12\'\n\x07manager\x18\x01 \x01(\x0b\x32\x14.qip_web.ManagerInfoH\x00\x12%\n\x06worker\x18\x02 \x01(\x0b\x32\x13.qip_web.WorkerInfoH\x00\x42\x0b\n\thost_info\"\x81\x01\n\nManagerLog\x12\x12\n\nmanager_id\x18\x01 \x01(\t\x12\x14\n\nstring_log\x18\x02 \x01(\tH\x00\x12\x16\n\x0cstring_error\x18\x03 \x01(\tH\x00\x12\x11\n\x07set_job\x18\x04 \x01(\tH\x00\x12\x13\n\tclear_job\x18\x05 \x01(\tH\x00\x42\t\n\x07logtype\"\x7f\n\tWorkerLog\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\x14\n\nstring_log\x18\x02 \x01(\tH\x00\x12\x16\n\x0cstring_error\x18\x03 \x01(\tH\x00\x12\x11\n\x07set_job\x18\x04 \x01(\tH\x00\x12\x13\n\tclear_job\x18\x05 \x01(\tH\x00\x42\t\n\x07logtype')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -137,8 +137,36 @@ _MANAGERLOG = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='string_log', full_name='qip_web.ManagerLog.string_log', index=0,
+      name='manager_id', full_name='qip_web.ManagerLog.manager_id', index=0,
       number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='string_log', full_name='qip_web.ManagerLog.string_log', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='string_error', full_name='qip_web.ManagerLog.string_error', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='set_job', full_name='qip_web.ManagerLog.set_job', index=3,
+      number=4, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='clear_job', full_name='qip_web.ManagerLog.clear_job', index=4,
+      number=5, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -158,8 +186,8 @@ _MANAGERLOG = _descriptor.Descriptor(
       name='logtype', full_name='qip_web.ManagerLog.logtype',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=205,
-  serialized_end=250,
+  serialized_start=206,
+  serialized_end=335,
 )
 
 
@@ -171,8 +199,36 @@ _WORKERLOG = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='string_log', full_name='qip_web.WorkerLog.string_log', index=0,
+      name='worker_id', full_name='qip_web.WorkerLog.worker_id', index=0,
       number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='string_log', full_name='qip_web.WorkerLog.string_log', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='string_error', full_name='qip_web.WorkerLog.string_error', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='set_job', full_name='qip_web.WorkerLog.set_job', index=3,
+      number=4, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='clear_job', full_name='qip_web.WorkerLog.clear_job', index=4,
+      number=5, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -192,8 +248,8 @@ _WORKERLOG = _descriptor.Descriptor(
       name='logtype', full_name='qip_web.WorkerLog.logtype',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=252,
-  serialized_end=296,
+  serialized_start=337,
+  serialized_end=464,
 )
 
 _LOGGERHOSTINFO.fields_by_name['manager'].message_type = _MANAGERINFO
@@ -207,9 +263,27 @@ _LOGGERHOSTINFO.fields_by_name['worker'].containing_oneof = _LOGGERHOSTINFO.oneo
 _MANAGERLOG.oneofs_by_name['logtype'].fields.append(
   _MANAGERLOG.fields_by_name['string_log'])
 _MANAGERLOG.fields_by_name['string_log'].containing_oneof = _MANAGERLOG.oneofs_by_name['logtype']
+_MANAGERLOG.oneofs_by_name['logtype'].fields.append(
+  _MANAGERLOG.fields_by_name['string_error'])
+_MANAGERLOG.fields_by_name['string_error'].containing_oneof = _MANAGERLOG.oneofs_by_name['logtype']
+_MANAGERLOG.oneofs_by_name['logtype'].fields.append(
+  _MANAGERLOG.fields_by_name['set_job'])
+_MANAGERLOG.fields_by_name['set_job'].containing_oneof = _MANAGERLOG.oneofs_by_name['logtype']
+_MANAGERLOG.oneofs_by_name['logtype'].fields.append(
+  _MANAGERLOG.fields_by_name['clear_job'])
+_MANAGERLOG.fields_by_name['clear_job'].containing_oneof = _MANAGERLOG.oneofs_by_name['logtype']
 _WORKERLOG.oneofs_by_name['logtype'].fields.append(
   _WORKERLOG.fields_by_name['string_log'])
 _WORKERLOG.fields_by_name['string_log'].containing_oneof = _WORKERLOG.oneofs_by_name['logtype']
+_WORKERLOG.oneofs_by_name['logtype'].fields.append(
+  _WORKERLOG.fields_by_name['string_error'])
+_WORKERLOG.fields_by_name['string_error'].containing_oneof = _WORKERLOG.oneofs_by_name['logtype']
+_WORKERLOG.oneofs_by_name['logtype'].fields.append(
+  _WORKERLOG.fields_by_name['set_job'])
+_WORKERLOG.fields_by_name['set_job'].containing_oneof = _WORKERLOG.oneofs_by_name['logtype']
+_WORKERLOG.oneofs_by_name['logtype'].fields.append(
+  _WORKERLOG.fields_by_name['clear_job'])
+_WORKERLOG.fields_by_name['clear_job'].containing_oneof = _WORKERLOG.oneofs_by_name['logtype']
 DESCRIPTOR.message_types_by_name['ManagerInfo'] = _MANAGERINFO
 DESCRIPTOR.message_types_by_name['WorkerInfo'] = _WORKERINFO
 DESCRIPTOR.message_types_by_name['LoggerHostInfo'] = _LOGGERHOSTINFO
