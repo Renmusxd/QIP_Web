@@ -2,9 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>QIP Monitor</title>
 </head>
 <body>
+<h1>Job monitor</h1>
+<table>
+<tr>
+    {% for job in jobs %}
+        <th>Job <a href="/jobs/{{ job }}">{{ job }}</a></th>
+        <hr>
+    {% endfor %}
+</tr>
+</table>
 
 </body>
 </html>

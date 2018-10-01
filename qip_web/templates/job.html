@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Job {{ job }}</title>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src = "https://d3js.org/d3-request.v1.min.js"></script>
+</head>
+<body style="height:100%;width:100%;" onload="startCallbacks('{{ job }}');">
+<div>
+<h1>Job {{ job }}</h1>
+<h2>N: {{ n_qubits }}</h2>
+</div>
+
+<div class="svg-container">
+    <svg style="height:80vh; width:100vw" viewBox="0 0 1 1" preserveAspectRatio="xMidYMid meet"></svg>
+</div>
+
+<script>
+    function fillWorkerMatrix(n, workers) {
+        let indices = 2**n;
+        let svg = d3.select("svg");
+
+        svg.selectAll('rect').data(workers).enter().append('rect');
+        svg.selectAll('rect').data(workers).style('fill', function(worker){
+                switch (worker.op) {
+                    case 'waiting_for_operation': return 'green';
+                    case 'running_operation': return 'yellow';
+                    case 'sending_state': return 'blue';
+                    case 'receiving_state': return 'lightblue';
+                    case null: return 'grey';
+                }
+            })
+            .style('stroke', 'white')
+            .style('stroke-width', 0.1/Math.sqrt(workers.length))
+            .attr('x', function(worker){
+                return worker.input_start / indices;
+            })
+            .attr('y', function(worker){
+                return worker.output_start / indices;
+            })
+            .attr('width', function(worker){
+                return (worker.input_end - worker.input_start) / indices;
+            })
+            .attr('height', function(worker){
+                return (worker.output_end - worker.output_start) / indices;
+            });
+        svg.selectAll('rect').data(workers).exit().remove();
+    }
+
+    function jobCallback(json_obj){
+        console.log(json_obj.workers);
+        fillWorkerMatrix(json_obj.n, json_obj.workers);
+    }
+
+    function startCallbacks(job){
+        d3.json('/api/jobs/' + job, jobCallback);
+        setInterval(function (){d3.json('/api/jobs/' + job, jobCallback)}, 1000);
+    }
+</script>
+</body>
+</html>

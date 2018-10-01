@@ -7,20 +7,22 @@ from qip.distributed.formatsock import FormatSocket
 import socket
 import uuid
 
+import time
+
 
 class MonitorServerLogger(ServerLogger):
-    def __init__(self, addr: str, port: int):
+    def __init__(self, addr: str = 'localhost', port: int = 6060):
         super().__init__()
         self.addr = addr
         self.port = port
-        self.server_id = uuid.uuid4()
+        self.server_id = str(uuid.uuid4())
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((self.addr, self.port))
         self.sock = FormatSocket(sock)
 
         host_info = LoggerHostInfo()
-        host_info.manager_info.manager_id = self.server_id
+        host_info.manager.manager_id = self.server_id
         self.sock.send(host_info.SerializeToString())
 
         self.proto_arena = ManagerLog()
@@ -28,7 +30,7 @@ class MonitorServerLogger(ServerLogger):
     def send(self):
         self.proto_arena.manager_id = self.server_id
         self.sock.send(self.proto_arena.SerializeToString())
-        self.proto_arena.clear()
+        self.proto_arena.Clear()
 
     def log_string(self, s, **kwargs):
         self.proto_arena.string_log = s
@@ -56,8 +58,9 @@ class MonitorServerLogger(ServerLogger):
     def waiting_for_setup(self):
         self.log_string("Waiting for setup.")
 
-    def making_state(self, handle: str):
-        self.proto_arena.set_job = handle
+    def making_state(self, handle: str, n: int):
+        self.proto_arena.set_job.job_id = handle
+        self.proto_arena.set_job.n = n
         self.send()
 
     def closing_state(self, handle: str):
@@ -68,10 +71,13 @@ class MonitorServerLogger(ServerLogger):
         self.log_string("Waiting for operation for job {}".format(handle))
 
     def running_operation(self, handle: str, op: WorkerOperation):
-        self.log_string("Running operation: {} for {}".format(op, handle))
+        self.proto_arena.running_op.handle = handle
+        self.proto_arena.running_op.op = op.SerializeToString()
+        self.send()
 
     def done_running_operation(self, handle: str, op: WorkerOperation):
-        self.log_string("Done running operation for {}".format(handle))
+        self.proto_arena.done_with_op.handle = handle
+        self.send()
 
     def allocating_workers(self, handle: str, n: int):
         self.log_string("Allocating {} worker(s) for {}.".format(n, handle))
@@ -81,26 +87,26 @@ class MonitorServerLogger(ServerLogger):
 
 
 class MonitorWorkerLogger(WorkerLogger):
-    def __init__(self, addr: str, port: int):
+    def __init__(self, addr: str = 'localhost', port: int = 6060):
         super().__init__()
         self.addr = addr
         self.port = port
-        self.worker_id = uuid.uuid4()
+        self.worker_id = str(uuid.uuid4())
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((self.addr, self.port))
         self.sock = FormatSocket(sock)
 
         host_info = LoggerHostInfo()
-        host_info.worker_info.worker_id = self.worker_id
+        host_info.worker.worker_id = self.worker_id
         self.sock.send(host_info.SerializeToString())
 
-        self.proto_arena = ManagerLog()
+        self.proto_arena = WorkerLog()
 
     def send(self):
         self.proto_arena.worker_id = self.worker_id
         self.sock.send(self.proto_arena.SerializeToString())
-        self.proto_arena.clear()
+        self.proto_arena.Clear()
 
     def log_string(self, s, **kwargs):
         self.proto_arena.string_log = s
@@ -125,8 +131,13 @@ class MonitorWorkerLogger(WorkerLogger):
     def accepted_setup(self, setup: WorkerSetup):
         self.log_string("Setup: {}".format(setup))
 
-    def making_state(self, handle: str):
-        self.proto_arena.set_job = handle
+    def making_state(self, handle: str, input_start: int, input_end: int, output_start: int, output_end: int):
+        self.proto_arena.set_job.job_id = handle
+        self.proto_arena.set_job.input_start = input_start
+        self.proto_arena.set_job.input_end = input_end
+        self.proto_arena.set_job.output_start = output_start
+        self.proto_arena.set_job.output_end = output_end
+
         self.send()
 
     def closing_state(self, handle: str):
@@ -137,8 +148,17 @@ class MonitorWorkerLogger(WorkerLogger):
         self.log_string("Waiting for operation for job {}".format(handle))
 
     def running_operation(self, handle: str, op: WorkerOperation):
-        self.log_string("Running operation: {} for {}".format(op, handle))
+        self.proto_arena.running_op.handle = handle
+        self.proto_arena.running_op.op = op.SerializeToString()
+        self.send()
 
     def done_running_operation(self, handle: str, op: WorkerOperation):
-        self.log_string("Done running operation for {}".format(handle))
+        self.proto_arena.done_with_op.handle = handle
+        self.send()
+
+    def sending_state(self, handle: str):
+        self.proto_arena.sending_state = handle
+
+    def receiving_state(self, handle: str):
+        self.proto_arena.receiving_state = handle
 

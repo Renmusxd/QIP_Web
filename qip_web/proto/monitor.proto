@@ -17,15 +17,35 @@ message LoggerHostInfo {
     }
 }
 
+message ManagerJob {
+    optional string job_id = 1;
+    optional int32 n = 2;
+}
+
+message LogOp {
+    optional string handle = 1;
+    // This is a serialized WorkerOperation
+    optional bytes op = 2;
+}
 
 message ManagerLog {
     optional string manager_id = 1;
     oneof logtype {
         string string_log = 2;
         string string_error = 3;
-        string set_job = 4;
+        ManagerJob set_job = 4;
         string clear_job = 5;
+        LogOp running_op = 6;
+        LogOp done_with_op = 7;
     }
+}
+
+message WorkerJob {
+    optional string job_id = 1;
+    optional int64 input_start = 2;
+    optional int64 input_end = 3;
+    optional int64 output_start = 4;
+    optional int64 output_end = 5;
 }
 
 message WorkerLog {
@@ -33,7 +53,11 @@ message WorkerLog {
     oneof logtype {
         string string_log = 2;
         string string_error = 3;
-        string set_job = 4;
+        WorkerJob set_job = 4;
         string clear_job = 5;
+        LogOp running_op = 6;
+        LogOp done_with_op = 7;
+        string sending_state = 8;
+        string receiving_state = 9;
     }
 }

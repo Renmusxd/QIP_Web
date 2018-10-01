@@ -1,12 +1,14 @@
 from qip_web.proto import *
 from qip.distributed import formatsock
 from qip.distributed.manager import AnnotatedSocket
+from qip.distributed.proto import WorkerOperation
 from enum import Enum
 from threading import RLock, Condition, Thread
-from typing import Tuple, Mapping, Sequence
+from typing import Tuple, Mapping, Sequence, Optional, MutableMapping, Any
 import socket
 import ssl
 import select
+import json
 
 
 class HostRepr(object):
@@ -17,9 +19,11 @@ class HostRepr(object):
     def __init__(self, host_type: HostType, host_id: str):
         self.host_type = host_type
         self.host_id = host_id
+        self.current_op = None
         self.logs = []
         self.errors = []
         self.job = None
+        self.lock = RLock()
 
     def get_host_type(self) -> HostType:
         return self.host_type
@@ -27,50 +31,134 @@ class HostRepr(object):
     def get_id(self) -> str:
         return self.host_id
 
-    def push_logs(self, s: str):
-        self.logs.append(s)
+    def set_op(self, op: WorkerOperation):
+        with self.lock:
+            self.current_op = op
 
-    def push_errors(self, s: str):
-        self.errors.append(s)
+    def set_job(self, job_handle: str):
+        with self.lock:
+            self.job = job_handle
+
+    def clear_op(self):
+        with self.lock:
+            self.current_op = None
+
+    def push_log(self, s: str):
+        with self.lock:
+            self.logs.append(s)
+
+    def push_error(self, s: str):
+        with self.lock:
+            self.errors.append(s)
 
     def pop_logs(self) -> Tuple[Sequence[str], Sequence[str]]:
-        tmp_log, tmp_err = self.logs, self.errors
-        self.logs = []
-        self.errors = []
-        return tmp_log, tmp_err
+        with self.lock:
+            tmp_log, tmp_err = self.logs, self.errors
+            self.logs = []
+            self.errors = []
+            return tmp_log, tmp_err
+
+    def get_dict(self) -> MutableMapping[str, Any]:
+        with self.lock:
+            return {
+                'host_type': self.host_type.name,
+                'host_id': self.host_id,
+                'job': self.job or ''
+            }
+
+    def get_json(self):
+        return json.dumps(self.get_dict())
 
 
 class ManagerRepr(HostRepr):
-    class ManagerOperation(Enum):
+    class ManagerOperationEnum(Enum):
         waiting_for_operation = 1
         running_operation = 2
 
     def __init__(self, host_info: LoggerHostInfo):
-        super().__init__(HostRepr.HostType.manager, host_info.manager_info.manager_id)
+        super().__init__(HostRepr.HostType.manager, host_info.manager.manager_id)
+        self.op_enum = ManagerRepr.ManagerOperationEnum.waiting_for_operation
+
+    def set_op(self, op: WorkerOperation):
+        with self.lock:
+            super(ManagerRepr, self).set_op(op)
+            self.op_enum = ManagerRepr.ManagerOperationEnum.running_operation
+
+    def clear_op(self):
+        with self.lock:
+            super(ManagerRepr, self).clear_op()
+            self.op_enum = ManagerRepr.ManagerOperationEnum.waiting_for_operation
+
+    def get_dict(self) -> MutableMapping[str, Any]:
+        with self.lock:
+            output_dict = super(ManagerRepr, self).get_dict()
+            if self.op_enum:
+                output_dict['op'] = self.op_enum.name
+
+        return output_dict
 
 
 class WorkerRepr(HostRepr):
-    class WorkerOperation(Enum):
+    class WorkerOperationEnum(Enum):
         waiting_for_operation = 1
         running_operation = 2
         sending_state = 3
         receiving_state = 4
 
     def __init__(self, host_info: LoggerHostInfo):
-        super().__init__(HostRepr.HostType.worker, host_info.worker_info.worker_id)
+        super().__init__(HostRepr.HostType.worker, host_info.worker.worker_id)
+        self.op_enum = WorkerRepr.WorkerOperationEnum.waiting_for_operation
+        self.input_start = 0
+        self.input_end = 0
+        self.output_start = 0
+        self.output_end = 0
+
+    def set_op(self, op: WorkerOperation):
+        with self.lock:
+            super(WorkerRepr, self).set_op(op)
+            self.op_enum = WorkerRepr.WorkerOperationEnum.running_operation
+
+    def clear_op(self):
+        with self.lock:
+            super(WorkerRepr, self).clear_op()
+            self.op_enum = WorkerRepr.WorkerOperationEnum.waiting_for_operation
+
+    def sending_state(self):
+        with self.lock:
+            self.op_enum = WorkerRepr.WorkerOperationEnum.sending_state
+
+    def receiving_state(self):
+        with self.lock:
+            self.op_enum = WorkerRepr.WorkerOperationEnum.receiving_state
+
+    def get_dict(self) -> MutableMapping[str, Any]:
+        with self.lock:
+            output_dict = super(WorkerRepr, self).get_dict()
+            if self.op_enum:
+                output_dict['op'] = self.op_enum.name
+            output_dict['input_start'] = self.input_start
+            output_dict['input_end'] = self.input_end
+            output_dict['output_start'] = self.output_start
+            output_dict['output_end'] = self.output_end
+
+        return output_dict
 
 
 class MonitorServer(Thread):
     INPUT_TIMEOUT = 5
 
-    def __init__(self, host: str = '0.0.0.0', port: int = 1708, certfile: str = None, keyfile: str = None):
+    def __init__(self, host: str = '0.0.0.0', port: int = 6060, certfile: str = None, keyfile: str = None):
         super().__init__()
         self.host = host
         self.port = port
 
         self.tcpsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcpsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.tcpsock.bind((host, port))
+        self.tcpsock.bind((self.host, self.port))
+
+        if self.port == 0:
+            self.port = self.tcpsock.getsockname()[1]
+        print("[*] Monitor port is {}".format(self.port))
 
         self.ssl = certfile and keyfile
         self.certfile = certfile
@@ -81,10 +169,11 @@ class MonitorServer(Thread):
         self.manager_sockets = {}
         self.worker_sockets = {}
 
-        self.job_hosts = {}
-
         self.socket_lock = RLock()
         self.socket_cond = Condition(self.socket_lock)
+
+        self.job_hosts = {}
+        self.job_lock = RLock()
 
     def run(self):
         t = Thread(target=MonitorServer.accept, args=(self,))
@@ -111,12 +200,12 @@ class MonitorServer(Thread):
 
             # Store alongside the socket whether it's a manager or not.
             with self.socket_lock:
-                if host_info.HasAttribute('manager_info'):
-                    self.manager_sockets[host_info.manager_info.manager_id] = AnnotatedSocket(clientformatsock,
-                                                                                              ManagerRepr(host_info))
-                elif host_info.HasAttribute('worker_info'):
-                    self.manager_sockets[host_info.worker_info.worker_id] = AnnotatedSocket(clientformatsock,
-                                                                                            WorkerRepr(host_info))
+                if host_info.HasField('manager'):
+                    self.manager_sockets[host_info.manager.manager_id] = AnnotatedSocket(clientformatsock,
+                                                                                         ManagerRepr(host_info))
+                elif host_info.HasField('worker'):
+                    self.worker_sockets[host_info.worker.worker_id] = AnnotatedSocket(clientformatsock,
+                                                                                      WorkerRepr(host_info))
                 self.socket_cond.notify()
 
     def get_socks(self):
@@ -140,60 +229,116 @@ class MonitorServer(Thread):
                     self.serve_worker(WorkerLog.FromString(annsock.sock.recv()))
 
     def serve_manager(self, log: ManagerLog):
+        print(log)
+
         man_id = log.manager_id
-        with self.worker_sockets:
-            manager = self.manager_sockets[man_id]
+        with self.socket_lock:
+            manager = self.manager_sockets[man_id].info
 
-        if log.HasAttribute('string_log'):
-            manager.info.push_log(log.string_log)
+        if log.HasField('string_log'):
+            manager.push_log(log.string_log)
 
-        elif log.HasAttribute('error_log'):
-            manager.info.push_error(log.string_error)
+        elif log.HasField('string_error'):
+            manager.push_error(log.string_error)
 
-        elif log.HasAttribute('set_job'):
-            manager.job = log.set_job
-            if log.set_job not in self.job_hosts:
-                self.job_hosts[log.set_job] = (manager, [])
-            else:
-                self.job_hosts[log.set_job] = (manager, self.job_hosts[log.set_job][1])
+        elif log.HasField('set_job'):
+            manager.set_job(log.set_job.job_id)
+            with self.job_lock:
+                if log.set_job.job_id not in self.job_hosts:
+                    self.job_hosts[log.set_job.job_id] = (log.set_job.n,
+                                                          manager,
+                                                          [])
+                else:
+                    self.job_hosts[log.set_job.job_id] = (log.set_job.n,
+                                                          manager,
+                                                          self.job_hosts[log.set_job.job_id][-1])
 
-        elif log.HasAttribute('clean_job'):
+        elif log.HasField('clear_job'):
             manager.job = None
-            if log.clean_job in self.job_hosts:
-                self.job_hosts[log.clean_job] = (None, self.job_hosts[log.clean_job])
+            with self.job_lock:
+                if log.clear_job in self.job_hosts:
+                    self.job_hosts[log.clear_job] = (0, None, self.job_hosts[log.clear_job])
+
+        elif log.HasField('running_op'):
+            op = WorkerOperation.FromString(log.running_op.op)
+            manager.set_op(op)
+
+        elif log.HasField('done_with_op'):
+            manager.clear_op()
 
     def serve_worker(self, log: WorkerLog):
+        print(log)
+
         worker_id = log.worker_id
-        with self.worker_sockets:
-            worker = self.worker_sockets[worker_id]
+        with self.socket_lock:
+            worker = self.worker_sockets[worker_id].info
 
-        if log.HasAttribute('string_log'):
-            worker.info.push_log(log.string_log)
+        if log.HasField('string_log'):
+            worker.push_log(log.string_log)
 
-        elif log.HasAttribute('error_log'):
-            worker.info.push_error(log.string_error)
+        elif log.HasField('string_error'):
+            worker.push_error(log.string_error)
 
-        elif log.HasAttribute('set_job'):
-            worker.job = log.set_job
-            if log.set_job not in self.job_hosts:
-                self.job_hosts[log.set_job] = (None, [worker])
-            else:
-                manager, workers = self.job_hosts[log.set_job]
-                self.job_hosts[log.set_job] = (manager, workers + [worker])
+        elif log.HasField('set_job'):
+            worker.set_job(log.set_job.job_id)
+            worker.input_start = log.set_job.input_start
+            worker.input_end = log.set_job.input_end
+            worker.output_start = log.set_job.output_start
+            worker.output_end = log.set_job.output_end
+            with self.job_lock:
+                if log.set_job.job_id not in self.job_hosts:
+                    self.job_hosts[log.set_job.job_id] = (0, None, [worker])
+                else:
+                    job_n, manager, workers = self.job_hosts[log.set_job.job_id]
+                    self.job_hosts[log.set_job.job_id] = (job_n, manager, workers + [worker])
 
-        elif log.HasAttribute('clear_job'):
+        elif log.HasField('clear_job'):
             worker.job = None
-            if log.clean_job in self.job_hosts:
-                if worker in self.job_hosts[log.clean_job][1]:
-                    self.job_hosts[log.clean_job][1].remove(worker)
+            with self.job_lock:
+                if log.clear_job in self.job_hosts:
+                    _, _, workers = self.job_hosts[log.clear_job]
+                    if worker in workers:
+                        workers.remove(worker)
+
+        elif log.HasField('running_op'):
+            op = WorkerOperation.FromString(log.running_op.op)
+            worker.set_op(op)
+
+        elif log.HasField('done_with_op'):
+            worker.clear_op()
+
+        elif log.HasField('sending_state'):
+            worker.sending_state()
+
+        elif log.HasField('receiving_state'):
+            worker.receiving_state()
 
     # To get information from the server use the functions below
+    def list_jobs(self) -> Sequence[str]:
+        with self.job_lock:
+            return list(self.job_hosts.keys())
+
+    def job_details(self, job_handle: str) -> Optional[Mapping[str, Any]]:
+        with self.job_lock:
+            if job_handle not in self.job_hosts:
+                return None
+            job_n, manager, workers = self.job_hosts[job_handle]
+        return {
+            'manager': manager.get_dict() if manager else dict(),
+            'workers': [worker.get_dict() for worker in workers] if workers else [],
+            'n': job_n
+        }
+
+    def all_jobs(self):
+        with self.job_lock:
+            return {handle: self.job_details(handle) for handle in self.list_jobs()}
+
     def pop_manager_logs(self) -> Tuple[Mapping[str, Sequence[str]], Mapping[str, Sequence[str]]]:
-        with self.worker_sockets:
+        with self.socket_lock:
             zip_dict = {k: self.manager_sockets[k].info.pop_logs() for k in self.manager_sockets}
             return {k: v[0] for k, v in zip_dict.items()}, {k: v[1] for k, v in zip_dict.items()}
 
     def pop_worker_logs(self) -> Tuple[Mapping[str, Sequence[str]], Mapping[str, Sequence[str]]]:
-        with self.worker_sockets:
+        with self.socket_lock:
             zip_dict = {k: self.worker_sockets[k].info.pop_logs() for k in self.worker_sockets}
             return {k: v[0] for k, v in zip_dict.items()}, {k: v[1] for k, v in zip_dict.items()}
