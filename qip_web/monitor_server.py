@@ -45,11 +45,13 @@ class HostRepr(object):
 
     def push_log(self, s: str):
         with self.lock:
-            self.logs.append(s)
+            # self.logs.append(s)
+            pass
 
     def push_error(self, s: str):
         with self.lock:
-            self.errors.append(s)
+            # self.errors.append(s)
+            pass
 
     def pop_logs(self) -> Tuple[Sequence[str], Sequence[str]]:
         with self.lock:
@@ -229,8 +231,6 @@ class MonitorServer(Thread):
                     self.serve_worker(WorkerLog.FromString(annsock.sock.recv()))
 
     def serve_manager(self, log: ManagerLog):
-        print(log)
-
         man_id = log.manager_id
         with self.socket_lock:
             manager = self.manager_sockets[man_id].info
@@ -245,19 +245,20 @@ class MonitorServer(Thread):
             manager.set_job(log.set_job.job_id)
             with self.job_lock:
                 if log.set_job.job_id not in self.job_hosts:
-                    self.job_hosts[log.set_job.job_id] = (log.set_job.n,
-                                                          manager,
-                                                          [])
+                    self.job_hosts[log.set_job.job_id] = (log.set_job.n, manager, [])
                 else:
-                    self.job_hosts[log.set_job.job_id] = (log.set_job.n,
-                                                          manager,
-                                                          self.job_hosts[log.set_job.job_id][-1])
+                    _, _, workers = self.job_hosts[log.set_job.job_id]
+                    self.job_hosts[log.set_job.job_id] = (log.set_job.n, manager, workers)
 
         elif log.HasField('clear_job'):
             manager.job = None
             with self.job_lock:
                 if log.clear_job in self.job_hosts:
-                    self.job_hosts[log.clear_job] = (0, None, self.job_hosts[log.clear_job])
+                    _, _, workers = self.job_hosts[log.clear_job]
+                    if workers:
+                        self.job_hosts[log.clear_job] = (0, None, workers)
+                    else:
+                        self.job_hosts.pop(log.clear_job)
 
         elif log.HasField('running_op'):
             op = WorkerOperation.FromString(log.running_op.op)
@@ -267,8 +268,6 @@ class MonitorServer(Thread):
             manager.clear_op()
 
     def serve_worker(self, log: WorkerLog):
-        print(log)
-
         worker_id = log.worker_id
         with self.socket_lock:
             worker = self.worker_sockets[worker_id].info
@@ -290,15 +289,17 @@ class MonitorServer(Thread):
                     self.job_hosts[log.set_job.job_id] = (0, None, [worker])
                 else:
                     job_n, manager, workers = self.job_hosts[log.set_job.job_id]
-                    self.job_hosts[log.set_job.job_id] = (job_n, manager, workers + [worker])
+                    workers.append(worker)
 
         elif log.HasField('clear_job'):
             worker.job = None
             with self.job_lock:
                 if log.clear_job in self.job_hosts:
-                    _, _, workers = self.job_hosts[log.clear_job]
+                    job_n, manager, workers = self.job_hosts[log.clear_job]
                     if worker in workers:
                         workers.remove(worker)
+                    if not job_n and not manager and not workers:
+                        self.job_hosts.pop(log.clear_job)
 
         elif log.HasField('running_op'):
             op = WorkerOperation.FromString(log.running_op.op)

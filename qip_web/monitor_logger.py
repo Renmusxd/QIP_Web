@@ -158,7 +158,8 @@ class MonitorWorkerLogger(WorkerLogger):
 
     def sending_state(self, handle: str):
         self.proto_arena.sending_state = handle
+        self.send()
 
     def receiving_state(self, handle: str):
         self.proto_arena.receiving_state = handle
-
+        self.send()

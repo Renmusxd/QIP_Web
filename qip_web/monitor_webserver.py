@@ -38,9 +38,11 @@ def json_job(job):
 @app.route('/jobs/<job>')
 def job_page(job):
     job_details = monitor_server.job_details(job)
-    return render_template('job.html', job=job, n_qubits=job_details['n'],
-                           workers=job_details['workers'])
-
+    if job_details:
+        return render_template('job.html', job=job, n_qubits=job_details['n'],
+                               workers=job_details['workers'])
+    else:
+        return "No such job found", 404
 
 @app.route('/job')
 def first_job_page():
